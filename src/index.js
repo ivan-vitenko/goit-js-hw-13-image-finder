@@ -1,8 +1,10 @@
 import './styles.css';
 import '../node_modules/basiclightbox/dist/basicLightbox.min.css';
+import '@pnotify/core/dist/BrightTheme.css';
+import { alert, notice, info, success, error } from '@pnotify/core';
+import '@pnotify/core/dist/PNotify.css';
 import ImagesApiService from './apiService';
 import galleryTemplate from './templates/gallery.hbs';
-import largeImage from './templates/large-image.hbs';
 import Debounce from 'lodash.debounce';
 import * as basicLightbox from 'basiclightbox';
 
@@ -15,7 +17,7 @@ const refs = {
 
 refs.inputEl.addEventListener('input', Debounce(onSearch, 500));
 
-function onSearch(event) {
+async function onSearch(event) {
   clearSearchResults();
 
   imagesApiService.query = event.target.value;
@@ -23,9 +25,11 @@ function onSearch(event) {
   if (imagesApiService.query) {
     createGallery();
     try {
-      imagesApiService.fetchImages().then(addItemsInGallery);
+      addItemsInGallery(await imagesApiService.fetchImages());
     } catch (error) {
-      alert(`${error}`);
+      error({
+        text: `Ой! Помилка ${error}`,
+      });
     }
     setNextPage();
   }
@@ -47,11 +51,30 @@ function addItemsInGallery(gallery) {
 
   select('.gallery').addEventListener('click', showLargeImage);
 
-  if (!select('.load-more-button') && gallery.total > 12) {
+  if (!select('.load-more-button') && isNotLastPage(gallery)) {
     addLoadMoreButton();
   }
 
+  if (isNotLastPage(gallery)) {
+    info({
+      text: 'Додано зображенння в галерею.',
+    });
+  }
+
+  if (!isNotLastPage(gallery) && imagesApiService.page > 1) {
+    select('.load-more-button').removeEventListener('click', showMoreImages);
+    removeOldElement(document.querySelector('.load-more-button'));
+
+    notice({
+      text: 'Це були додані останні зображеня в галерею!',
+    });
+  }
+
   scrollToEndPage();
+}
+
+function isNotLastPage(gallary) {
+  return imagesApiService.page < Math.ceil(gallary.totalHits / 12);
 }
 
 function showLargeImage(event) {
@@ -86,8 +109,8 @@ function addLoadMoreButton() {
   select('.load-more-button').addEventListener('click', showMoreImages);
 }
 
-function showMoreImages() {
-  imagesApiService.fetchImages().then(addItemsInGallery);
+async function showMoreImages() {
+  addItemsInGallery(await imagesApiService.fetchImages());
   imagesApiService.page += 1;
 }
 
